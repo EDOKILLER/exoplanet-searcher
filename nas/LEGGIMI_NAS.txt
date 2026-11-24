@@ -1,0 +1,113 @@
+EXOPLANET SEARCHER 1.1 - SERVIZIO PER IL NAS UGREEN (DXP4800 GT)
+=================================================================
+© 2026 Edoardo Battistel
+
+La ricerca gira sempre sul NAS, dentro l'app Docker di UGOS, a priorità minima.
+Il PC serve solo per guardare i risultati.
+
+Il NAS ha un AMD Ryzen Embedded R2514 (4 core, 8 thread). Il servizio:
+  - usa al massimo 4 thread su 8 e 6 GB di RAM su 16;
+  - gira con la priorità più bassa sia per il processore (nice 19) sia per i
+    dischi (ionice "idle"): appena le altre app del NAS chiedono risorse,
+    passano davanti;
+  - fa una ricerca APPROFONDITA: periodi fino a 250 giorni (prima 100),
+    griglia dei periodi più fine (oversampling 5 invece di 3), fino a 5
+    segnali per stella (prima 3), immagini a campo intero TESS fino alla
+    magnitudine 15 (prima 13);
+  - se manca Internet aspetta (da 1 minuto fino a 30 minuti tra un tentativo e
+    l'altro) e riparte da solo: le stelle non vengono segnate come errori;
+  - se il NAS si riavvia, il container riparte da solo dal punto in cui era;
+  - finito tutto, dorme 12 ore e poi controlla se sono usciti nuovi settori TESS.
+
+Tempi indicativi: alcuni minuti per stella TESS; un settore TESS a 2 minuti
+(15-20 mila stelle) richiede alcune settimane. Kepler, con 4 anni di dati e
+periodi fino a 250 giorni, è molto più lento. Il servizio non ha fretta: va
+avanti da solo per mesi.
+
+
+1. COPIA I FILE SUL NAS
+-----------------------
+Dentro la cartella che hai creato sul NAS
+    /home/<utente>/Exoplanet_Searcher
+crea una sottocartella chiamata  programma  e copiaci questi quattro file
+(dalla cartella "nas" di questa versione):
+    servizio_exo.py   motore_exo.py   avvia.sh   requisiti.txt
+Puoi usare la condivisione di rete dal PC oppure "Carica" nel File Manager
+di UGOS. Risultato:
+    Exoplanet_Searcher/
+        programma/
+            servizio_exo.py  motore_exo.py  avvia.sh  requisiti.txt
+
+
+2. PERCORSO DELLA CARTELLA PER DOCKER
+-------------------------------------
+Docker vede la cartella come
+    /volume1/Ugreen NAS/Exoplanet_Searcher
+ed è già scritto così in docker-compose.yml (tra virgolette, per lo spazio
+nel nome). Se un giorno sposti la cartella, correggi la riga "volumes".
+
+
+3. CREA IL PROGETTO NELL'APP DOCKER
+-----------------------------------
+  1. Apri l'app Docker di UGOS -> Progetto -> Crea.
+  2. Nome del progetto: exoplanet-searcher
+  3. Incolla tutto il contenuto di docker-compose.yml.
+  4. La riga sotto "volumes" deve restare esattamente:
+       - "/volume1/Ugreen NAS/Exoplanet_Searcher:/dati"
+  5. Distribuisci (Deploy).
+Docker scarica l'immagine python:3.12 (circa 1 GB, una volta sola).
+
+
+4. CONTROLLA CHE PARTA
+----------------------
+App Docker -> Container -> exoplanet-searcher -> Registro (Log):
+  - al primo avvio: "Primo avvio: installo le librerie (10-20 minuti…)";
+    le librerie restano in programma/_python, i riavvii poi sono immediati;
+  - poi: "TLS disponibile" e le righe della ricerca ("TESS, curve a 2 minuti
+    s0107: … stelle, da analizzare …").
+Se all'installazione manca Internet, riprova da solo ogni 10 minuti.
+Nella cartella Exoplanet_Searcher compaiono registro.txt, exo_config.json,
+servizio_attivo.json (aggiornato ogni minuto) e poi i risultati.
+
+
+5. GUARDA I RISULTATI DAL PC
+----------------------------
+UBUNTU: File -> Altre posizioni -> in basso "Connetti al server":
+        smb://<indirizzo del NAS>/  -> entra nella tua cartella personale
+        fino a Exoplanet_Searcher.
+WINDOWS: Esplora file -> \\<nome o indirizzo del NAS>\  -> stessa cartella
+        (puoi anche "Connetti unità di rete").
+Poi in Exoplanet Searcher 1.1: File -> Scegli la cartella dei risultati ->
+la cartella Exoplanet_Searcher del NAS. In alto comparirà "Ricerca in corso
+sul NAS" (o "NAS: in attesa di Internet") con l'avanzamento, aggiornato ogni
+30 secondi; i candidati nuovi compaiono nella tabella. Il pulsante Avvia resta
+disattivato, così PC e NAS non lavorano mai insieme sulla stessa cartella.
+Le schede dei candidati (grafici.png, scheda.pdf) sono in inglese.
+
+Vuoi continuare dai risultati già fatti sul PC? Con il programma del PC
+fermo, PRIMA del passo 3 copia nella cartella del NAS il contenuto di
+~/Scrivania/Astronomia/Exoplanet_Searcher (exo_stato.sqlite, i CSV,
+candidati/, _elenchi/, _cataloghi_noti/). Il NAS riparte da lì.
+
+
+6. OPZIONI (exo_config.json, nella cartella Exoplanet_Searcher)
+---------------------------------------------------------------
+  "profilo": "approfondito"      oppure "normale" (come sul PC, più veloce)
+  "missioni": {...}              true/false per TESS 2 min, TESS FFI, Kepler, K2
+  "mag_ffi": 15.0                magnitudine massima per le immagini a campo intero
+  "paralleli": 2                 stelle analizzate insieme
+  "thread_per_stella": 2         thread di TLS per ogni stella
+  "ore_di_pausa_a_fine_giro": 12
+Dopo una modifica: app Docker -> Container -> exoplanet-searcher -> Riavvia.
+Se il NAS ti sembra lento: "paralleli": 1 e, nel progetto, "cpus: 2.0".
+Se invece è sempre libero puoi salire fino a "paralleli": 3.
+
+
+7. FERMARE, AGGIORNARE
+----------------------
+  - Fermare: app Docker -> Container -> Ferma. Le stelle in corso vengono
+    rifatte al riavvio; nulla va perso.
+  - Nuova versione del programma: sostituisci i file in programma/ e riavvia
+    il container. Per reinstallare da zero le librerie cancella la cartella
+    programma/_python.
+  - I FITS scaricati vanno in _download/ e vengono cancellati dopo ogni stella.

@@ -1,0 +1,101 @@
+EXOPLANET SEARCHER 1.1 - ricerca automatica di esopianeti (TESS, Kepler, K2)
+===========================================================================
+© 2026 Edoardo Battistel
+
+Gira da solo finché il computer è acceso: scarica la curva di luce di una
+stella, cerca i transiti planetari, controlla i falsi positivi e i pianeti già
+noti, salva i risultati, cancella i FITS e passa alla stella successiva.
+
+Novità della 1.1
+----------------
+  - Può girare sul NAS UGREEN (cartella "nas", istruzioni in nas/LEGGIMI_NAS.txt):
+    ricerca continua, più lenta ma più approfondita, a priorità minima.
+    Il programma sul PC serve allora solo a guardare i risultati: scegli come
+    cartella dei risultati quella del NAS (File -> Scegli la cartella) e vedrai
+    "Ricerca in corso sul NAS" con l'avanzamento; "Avvia" resta disattivato.
+  - Se manca Internet la ricerca aspetta e riprova: le stelle non vengono più
+    segnate come errori (anche sul PC).
+  - Le schede dei candidati (grafici.png e scheda.pdf) sono in inglese,
+    pronte da mostrare o allegare a una segnalazione.
+
+File di questa cartella
+-----------------------
+  exoplanet_searcher.py        il programma (finestra)
+  motore_exo.py                i calcoli (deve stare accanto al programma)
+  crea_eseguibile_ubuntu.sh    crea l'eseguibile ExoplanetSearcher per Ubuntu
+  crea_eseguibile_windows.bat  crea ExoplanetSearcher.exe per Windows 11
+  nas/                         il servizio per il NAS (da copiare sul NAS)
+
+Creare l'eseguibile
+-------------------
+UBUNTU:   cd ~/Claude/Astropy/programma_exoplanet_searcher/versione_1.1
+          bash crea_eseguibile_ubuntu.sh
+WINDOWS:  installa Python da python.org ("Add python.exe to PATH"),
+          poi doppio clic su crea_eseguibile_windows.bat
+Alla fine:
+  - AUTOTEST (senza rete): trova un transito simulato, riconosce una binaria
+    a eclisse, prova lettura dei FITS, salvataggi, cancellazione e finestra.
+    La riga "[info] motore di ricerca" dice se TLS funziona (altrimenti BLS).
+  - DIAGNOSTICA (con rete, qualche minuto): ultimo settore TESS, elenco delle
+    stelle, NASA Exoplanet Archive, e due stelle con pianeti noti analizzate
+    davvero: pi Mensae (TESS, pianeta c a 6,27 giorni) e Kepler-10 (pianeta b
+    a 0,837 giorni). Il programma deve ritrovarli.
+
+Come lavora
+-----------
+  Ordine delle missioni (si possono escludere con le caselle):
+    1. TESS, curve a 2 minuti: un settore alla volta, dal più recente;
+    2. TESS, immagini a campo intero (curve TESS-SPOC): un settore alla volta,
+       solo le stelle fino alla magnitudine scelta (di base 13), dalle più luminose;
+    3. Kepler: una cartella dell'archivio alla volta; per ogni stella si usano
+       insieme tutti i trimestri (4 anni), necessari per i periodi lunghi;
+    4. K2: una campagna alla volta.
+  Per ogni stella:
+    - pulizia della curva (variazioni lente della stella con una mediana
+      mobile di circa 18 ore, brillamenti, punti di qualità cattiva);
+    - ricerca dei transiti con TLS (Transit Least Squares), fino a 3 segnali
+      per stella (dopo ogni segnale i suoi transiti vengono mascherati);
+    - controlli: SDE ≥ 9, SNR ≥ 7, almeno 2 transiti, profondità < 5 %,
+      raggio < 25 raggi terrestri, transiti pari/dispari uguali, nessuna
+      eclisse secondaria, forma non a V;
+    - confronto con NASA Exoplanet Archive (pianeti confermati, TOI di TESS,
+      KOI di Kepler, pianeti e candidati K2), per stella e periodo (anche
+      doppio, metà, triplo): "noto", "falso positivo noto", "nuovo in sistema
+      noto" (stella con pianeti noti, segnale diverso) oppure "nuovo".
+  I cataloghi dei noti vengono riscaricati una volta alla settimana.
+
+Cartella dei risultati (di base ~/Scrivania/Astronomia/Exoplanet_Searcher)
+-------------------------------------------------------------------------
+  riassunto_stelle.csv     una riga per ogni stella analizzata
+  candidati.csv            tutti i segnali che superano le soglie, con controlli e confronto
+  candidati/<stella>_<n>/  per i candidati nuovi: grafici.png e scheda.pdf
+                           in inglese (curva, transiti, periodogramma, transito
+                           ripiegato, pari/dispari, parametri, controlli, confronto)
+  registro.txt             cronologia
+  exo_stato.sqlite         stelle già analizzate (per riprendere da dove si era rimasti)
+  _elenchi/                elenchi delle stelle di ogni settore/cartella/campagna
+  _cataloghi_noti/         copie dei cataloghi dei pianeti noti
+  _download/               FITS temporanei: cancellati dopo ogni stella
+
+La finestra
+-----------
+  ▶ Avvia / ⏸ Pausa (la pausa arriva dopo le stelle in corso).
+  Caselle delle missioni, magnitudine massima per le immagini a campo intero,
+  stelle analizzate insieme (TLS usa comunque tutti i nuclei del processore),
+  "Riprendi la ricerca da solo all'apertura del programma".
+  Schede: ⭐ Candidati (clic = grafici a destra, doppio clic = scheda PDF;
+  di base solo i nuovi), 📜 Registro, 📊 Statistiche.
+  Quando trova un candidato nuovo che supera tutti i controlli: avviso nella
+  finestra, notifica del sistema e suono.
+
+Attenzione
+----------
+  Un candidato NON è un pianeta: va controllato (per esempio con i file dei
+  pixel, altri settori, dati da terra). I candidati più solidi si possono
+  segnalare alla comunità TESS su ExoFOP come "CTOI".
+  Tempi indicativi con TLS: 1-2 minuti per stella TESS, alcuni minuti per
+  Kepler (4 anni di dati). Un settore TESS a 2 minuti richiede giorni.
+
+Preferenze: ~/.exoplanet_searcher.json   Errori: ~/.exoplanet_searcher.log
+Crediti: MAST (STScI); NASA Exoplanet Archive (Caltech/IPAC);
+Transit Least Squares (Hippke & Heller 2019).

@@ -1,0 +1,26 @@
+# Exoplanet Searcher 1.1 - servizio per NAS UGREEN (app Docker -> Progetto -> Crea)
+# © 2026 Edoardo Battistel
+#
+# UNICA RIGA DA CONTROLLARE: il percorso a sinistra dei ":" in "volumes" deve essere
+# la cartella Exoplanet_Searcher vista dal NAS (già impostato: /volume1/Ugreen NAS/Exoplanet_Searcher).
+services:
+  exoplanet-searcher:
+    image: python:3.12
+    container_name: exoplanet-searcher
+    restart: unless-stopped
+    command: ["bash", "/dati/programma/avvia.sh"]
+    volumes:
+      - "/volume1/Ugreen NAS/Exoplanet_Searcher:/dati"
+    environment:
+      - TZ=Europe/Rome
+    # --- per non rallentare il NAS ---
+    cpus: 4.0              # al massimo metà dei thread del Ryzen R2514 (4 core / 8 thread)
+    cpu_shares: 2          # minima precedenza rispetto alle altre app quando il processore è occupato
+    mem_limit: 6g          # al massimo 6 GB dei 16 GB di RAM
+    blkio_config:
+      weight: 10           # minima precedenza sui dischi
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
